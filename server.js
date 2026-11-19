@@ -31,11 +31,40 @@ const ROUNDS = [
   { title: 'Финал', icon: '🏆', options: ['Оскар за лучшую пару', 'Сериал на 8 сезонов', 'Премия «Лучшая драка за последний круассан»', 'Сиквел обязателен', 'Награда «Самые странные герои года»', 'Открытый финал, продолжение завтра'] },
 ];
 
-const SYSTEM = 'Ты сценарист игры «Любовная фортуна» для двух реальных людей: Димы и Ани (они пара). Пиши по-русски: смешно, с каплей драмы и неожиданным поворотом. 90–140 слов, 2–3 яркие реплики с указанием, кто говорит. Реплики оформляй через тире, двойные кавычки внутри текста не используй. Продолжай прошлые части, не пересказывая их. Ответь ТОЛЬКО JSON без пояснений: {"story":"текст","scene":"одно предложение по-английски: что видно на картинке (без текста и без имён)"}';
+// Расскажи сказочнику, какие вы. Правь под себя: чем конкретнее, тем живее истории.
+const HEROES = 'Дима и Аня, пара. Дима азартный и вечно придумывает безумные планы. Аня наблюдательная и язвительно замечает то, что он упустил. Они дразнят друг друга, но всегда на одной стороне.';
+
+// Что должна делать каждая часть, чтобы история была цельной, а не набором случайных сцен
+const ARC = [
+  'ЗАВЯЗКА: быстро покажи героев в этой роли, дай им конкретную цель и маленькую проблему. Читатель должен сразу понять, кто они и чего хотят.',
+  'МЕСТО: действие переносится сюда. Опиши место 2–3 смешными конкретными деталями и поставь первое препятствие на пути к цели.',
+  'ОСЛОЖНЕНИЕ: всё идёт не так. Событие напрямую мешает цели из первой части, герои спорят, как выкручиваться.',
+  'ПОВОРОТ: неожиданный, но логичный поворот, который меняет смысл прошлых частей. Свяжи его с тем, что уже было.',
+  'ФИНАЛ: реши цель из первой части, вспомни 2 шутки или детали из прошлых частей и закончи тёплой романтичной нотой.',
+];
+
+const SYSTEM = `Ты автор смешных коротких историй для игры «Любовная фортуна». Героев всегда двое, это реальная пара: ${HEROES}
+
+СТИЛЬ:
+- Пиши живо и конкретно, как лучший друг рассказывает случай за столом: короткие предложения, никакой канцелярщины.
+- Смешное рождается из конкретных деталей и серьёзного тона в абсурдной ситуации. Шутки не объясняй.
+- 3–4 реплики героев через тире, у каждого свой голос: споры, подколки, нежность.
+- Не больше ОДНОГО нового персонажа за часть, дай ему имя или яркую черту.
+- Всё понятно с первого прочтения: кто где, чего хочет, что произошло. Не вводи новых правил мира без нужды.
+- Избегай штампов: «вдруг», «неожиданно», «в этот момент», «судьба», «приключение».
+- Прошлые части не пересказывай, а продолжай и ссылайся на их детали.
+- Каждая часть, кроме последней, кончается крючком: фраза, после которой хочется крутить колесо дальше.
+- Объём: 140–190 слов, два коротких абзаца.
+
+Пример тона (не копируй, это только для стиля): «Аня перевернула бабушкину карту. — Тут написано: копать там, где Дима потеряет носок. — Я носки не теряю! — сказал Дима и потерял носок. Они оба посмотрели вниз.»
+
+Ответь ТОЛЬКО JSON без пояснений и без markdown: {"beat":"одна короткая строка: что произошло в этой части","story":"текст части","scene":"одно предложение по-английски: что видно на картинке, обязательно мужчина и женщина, яркое действие, место, без текста и без имён"}
+Двойные кавычки внутри текста не используй, для цитат бери «ёлочки».`;
 
 // ---------- состояние и рассылка ----------
 const fresh = () => ({ round: 0, results: [], story: [], images: [], busy: false });
 let state = fresh();
+let beats = []; // короткие пересказы частей: так история не путается
 const clients = new Set();
 const send = (ws, m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
 const broadcast = m => clients.forEach(ws => send(ws, m));
@@ -55,10 +84,11 @@ async function cf(model, body) {
   return j.result || {};
 }
 
-async function chat(system, user, maxTokens) {
+async function chat(system, user, maxTokens, temperature = 0.9) {
   const r = await cf(STORY_MODEL, {
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     max_tokens: maxTokens,
+    temperature,
   });
   // Cloudflare иногда отдаёт ответ уже объектом, если он похож на JSON
   const out = r.response ?? (r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content) ?? '';
@@ -73,25 +103,37 @@ const parseJson = s => {
 
 async function writeStory() {
   const r = state.round, last = r === ROUNDS.length - 1;
+  const role = last ? ARC[ARC.length - 1] : ARC[Math.min(r, ARC.length - 2)];
   const picks = state.results.map((x, i) => `${ROUNDS[i].title}: ${x.label}`).join('\n');
-  const prompt = `Выпало по раундам:\n${picks}\n\nУже написано:\n${state.story.join('\n\n') || '(пока ничего)'}\n\nНапиши часть ${r + 1} из ${ROUNDS.length}. Обязательно используй то, что выпало сейчас: «${ROUNDS[r].title}: ${state.results[r].label}».${last ? ' Это финал: красиво закончи историю с романтичной ноткой.' : ''}`;
+  const before = beats.filter(Boolean).map((b, i) => `${i + 1}. ${b}`).join('\n') || '(это первая часть)';
+  const prev = r > 0 && state.story[r - 1] ? `Предыдущая часть целиком (продолжай с того места, где она оборвалась):\n${state.story[r - 1]}\n\n` : '';
+  const prompt = `Что выпало по раундам:\n${picks}\n\nКратко, что было раньше:\n${before}\n\n${prev}Напиши часть ${r + 1} из ${ROUNDS.length}.\nЗадача части: ${role}\nОбязательно используй то, что выпало сейчас: «${ROUNDS[r].title}: ${state.results[r].label}». Остальное выпавшее держи в фоне, не перечисляй всё подряд.`;
   let text = '';
   for (let i = 0; i < 2; i++) {
-    text = await chat(SYSTEM, prompt, 900);
+    text = await chat(SYSTEM, prompt, 1100);
     const m = text.match(/\{[\s\S]*\}/);
     const o = m && parseJson(m[0]);
-    if (o && o.story) return { story: String(o.story).trim(), scene: String(o.scene || '').trim() };
+    if (o && o.story) {
+      const story = String(o.story).trim();
+      return { story, scene: String(o.scene || '').trim(), beat: String(o.beat || '').trim() || story.slice(0, 120) };
+    }
     console.warn(`Попытка ${i + 1}: ответ не в формате JSON`);
   }
   // запасной вариант: берём текст как есть
-  const story = text.replace(/^[\s{]*"?story"?\s*:\s*"/i, '').replace(/",?\s*"scene"[\s\S]*$/i, '').replace(/["}\s]+$/, '').trim();
+  const story = text.replace(/^[\s{]*"?(beat|story)"?\s*:\s*"/i, '').replace(/",?\s*"(story|scene)"[\s\S]*$/i, '').replace(/["}\s]+$/, '').trim();
   if (!story) throw new Error('Модель вернула пустой ответ');
-  return { story, scene: '' };
+  return { story, scene: '', beat: story.slice(0, 120) };
 }
 
 // ---------- картинки ----------
 const photoCache = new Map();
-const findPhoto = name => ['jpg', 'jpeg', 'png', 'webp'].map(e => path.join(__dirname, 'photos', `${name}.${e}`)).find(fs.existsSync);
+const PHOTO_DIR = path.join(__dirname, 'photos');
+const listPhotos = () => { try { return fs.readdirSync(PHOTO_DIR).filter(f => !f.endsWith('.txt')); } catch { return []; } };
+// ищем dima.* и anya.* без учёта регистра (Dima.JPG тоже подойдёт)
+const findPhoto = name => {
+  const f = listPhotos().find(x => new RegExp(`^${name}\\.(jpe?g|png|webp)$`, 'i').test(x));
+  return f ? path.join(PHOTO_DIR, f) : null;
+};
 async function photoBuffer(file) {
   if (photoCache.has(file)) return photoCache.get(file);
   let buf = fs.readFileSync(file);
@@ -108,7 +150,9 @@ async function makeImage(scene, r) {
   if (!IMAGE_MODEL.includes('flux-2')) {
     note = null; // выбрана модель без фото: рисуем без лиц
   } else if (!files.every(Boolean)) {
-    note = 'Фото не найдены в папке photos (dima.jpg и anya.jpg), поэтому картинка нарисована без ваших лиц.';
+    const lost = ['dima', 'anya'].filter((n, i) => !files[i]).join(' и ');
+    note = `Не найдено фото: ${lost}. В папке photos сейчас: ${listPhotos().join(', ') || 'пусто'}. Нужны файлы dima.jpg и anya.jpg, поэтому картинка нарисована без ваших лиц.`;
+    console.warn(note);
   } else {
     try {
       const form = new FormData();
@@ -149,8 +193,9 @@ async function spin() {
   state.results[r] = { index, label: ROUNDS[r].options[index] };
   broadcast({ type: 'spin', round: r, index, label: state.results[r].label });
   try {
-    const { story, scene } = await writeStory();
+    const { story, scene, beat } = await writeStory();
     state.story[r] = story;
+    beats[r] = beat;
     broadcast({ type: 'story', round: r, story });
     try {
       const { url, note } = await makeImage(scene, r);
@@ -201,9 +246,10 @@ wss.on('connection', (ws, req) => {
     const res = state.results[state.round];
     if (m.type === 'spin' && !res) spin();
     else if (m.type === 'next' && res && state.round < ROUNDS.length - 1) { state.round++; broadcast(fullState()); }
-    else if (m.type === 'reset') { state = fresh(); broadcast(fullState()); }
+    else if (m.type === 'reset') { state = fresh(); beats = []; broadcast(fullState()); }
   });
 });
 
+console.log('Фото в папке photos:', listPhotos().join(', ') || 'нет');
 const PORT = ENV.PORT || 3000;
 server.listen(PORT, () => console.log(`Фортуна готова: http://localhost:${PORT}/?code=${ENV.ROOM_CODE || ''}`));

@@ -17,7 +17,7 @@ h1{font:800 clamp(24px,5vw,38px)/1.1 Unbounded,sans-serif;margin:0;color:var(--g
 #roundTitle{font:600 18px Unbounded,sans-serif;margin:22px 0 0}
 .stage{display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:28px;align-items:center;margin:20px 0}
 @media(max-width:720px){.stage{grid-template-columns:1fr}}
-.wheelbox{position:relative;width:min(100%,340px);aspect-ratio:1;margin:auto;container-type:inline-size}
+.wheelbox{position:relative;width:min(100%,340px);aspect-ratio:1;margin:auto}
 .bulb{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold)}
 .spinning .bulb:nth-child(even){animation:blink .35s infinite alternate}
 .spinning .bulb:nth-child(odd){animation:blink .35s .35s infinite alternate}
@@ -43,7 +43,7 @@ ol li.win{opacity:1;border-left-color:var(--gold);background:var(--panel);font-w
 .dl{display:inline-block;margin-top:10px;color:var(--gold);font-size:15px}
 .round img{display:block;width:100%;max-width:520px;border-radius:12px;margin-top:14px}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--coral);color:#fff;padding:10px 18px;border-radius:12px;max-width:90vw}
-@media(prefers-reduced-motion:reduce){.wheel{transition-duration:.01s}.bulb{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.bulb{animation:none!important}}
 </style>
 </head>
 <body>
@@ -75,8 +75,15 @@ let ROUNDS = [], S = null, ws, angle = 0, until = 0, toastTimer;
 
 // лампочки и цифры на колесе
 const box = $('#box'), wheel = $('#wheel');
-for (let i = 0; i < 20; i++) { const b = document.createElement('i'); b.className = 'bulb'; b.style.transform = `rotate(${i * 18}deg) translateY(-47cqw)`; box.appendChild(b); }
-for (let i = 0; i < 6; i++) { const n = document.createElement('b'); n.textContent = i + 1; const a = i * 60 + 30; n.style.transform = `rotate(${a}deg) translateY(-28cqw) rotate(${-a}deg)`; wheel.appendChild(n); }
+const bulbs = [], nums = [];
+for (let i = 0; i < 20; i++) { const b = document.createElement('i'); b.className = 'bulb'; box.appendChild(b); bulbs.push(b); }
+for (let i = 0; i < 6; i++) { const n = document.createElement('b'); n.textContent = i + 1; wheel.appendChild(n); nums.push(n); }
+function layout() {
+  const w = box.offsetWidth;
+  bulbs.forEach((b, i) => { b.style.transform = `rotate(${i * 18}deg) translateY(${-w * 0.47}px)`; });
+  nums.forEach((n, i) => { const a = i * 60 + 30; n.style.transform = `rotate(${a}deg) translateY(${-w * 0.28}px) rotate(${-a}deg)`; });
+}
+layout(); addEventListener('resize', layout);
 
 const later = fn => setTimeout(fn, Math.max(0, until - Date.now()));
 const toast = t => { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 5000); };
@@ -129,6 +136,7 @@ function render() {
   $('#feed').innerHTML = html;
   $('#copy').hidden = !S.story.some(Boolean);
 }
+
 
 const act = type => () => ws.readyState === 1 && ws.send(JSON.stringify({ type }));
 $('#spin').onclick = act('spin');

@@ -3,88 +3,215 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07040a">
 <title>Любовная фортуна</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#1E1147;--panel:#2C1B6B;--ink:#F7F3FF;--gold:#FFC857;--coral:#FF5D73;--teal:#2EC4B6;--violet:#7B5CFF;--pink:#FF8FB1;--sky:#4CC9F0}
+:root{--bg:#07040a;--rose:#ff4f9a;--rose2:#ff8cc0;--line:rgba(255,105,170,.32);--ink:#fff4f8;--mut:#c9a3b5;--glow:rgba(255,60,150,.55)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 Nunito,system-ui,sans-serif}
-main{max-width:920px;margin:0 auto;padding:20px 16px 60px}
-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-h1{font:800 clamp(24px,5vw,38px)/1.1 Unbounded,sans-serif;margin:0;color:var(--gold)}
-#peers{font-size:14px;opacity:.8}
-#roundTitle{font:600 18px Unbounded,sans-serif;margin:22px 0 0}
-.stage{display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:28px;align-items:center;margin:20px 0}
-@media(max-width:720px){.stage{grid-template-columns:1fr}}
-.wheelbox{position:relative;width:min(100%,340px);aspect-ratio:1;margin:auto}
-.bulb{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold)}
-.spinning .bulb:nth-child(even){animation:blink .35s infinite alternate}
-.spinning .bulb:nth-child(odd){animation:blink .35s .35s infinite alternate}
-@keyframes blink{to{opacity:.15}}
-.wheel{position:absolute;inset:16px;border-radius:50%;border:4px solid var(--ink);transition:transform 4.5s cubic-bezier(.12,.7,.1,1);
-background:conic-gradient(var(--coral) 0 60deg,var(--gold) 0 120deg,var(--teal) 0 180deg,var(--violet) 0 240deg,var(--pink) 0 300deg,var(--sky) 0 360deg)}
-.wheel b{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px;text-align:center;line-height:40px;font:800 28px Unbounded,sans-serif;color:var(--bg)}
-.pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:14px solid transparent;border-top:28px solid var(--ink);z-index:2}
-ol{margin:0;padding:0;list-style:none;display:grid;gap:8px}
-ol li{counter-increment:o;padding:8px 12px 8px 14px;border-left:4px solid transparent;border-radius:6px;opacity:.75}
-ol li::before{content:counter(o) ". ";font-weight:700}
-ol li.win{opacity:1;border-left-color:var(--gold);background:var(--panel);font-weight:700}
-.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:16px}
-.btn{font:800 16px Unbounded,sans-serif;background:var(--gold);color:var(--bg);border:0;border-radius:999px;padding:14px 26px;cursor:pointer}
-.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink);font-weight:600}
-.btn:disabled{opacity:.4;cursor:default}
-.btn:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 [hidden]{display:none!important}
-#status{min-height:1.5em;color:var(--gold)}
-.round{background:var(--panel);border-radius:18px;padding:18px 20px;margin-top:16px}
-.round h2{font:600 15px/1.3 Unbounded,sans-serif;margin:0 0 10px;color:var(--gold)}
-.round p{margin:0;white-space:pre-wrap;max-width:68ch}
-.dl{display:inline-block;margin-top:10px;color:var(--gold);font-size:15px}
-.round img{display:block;width:100%;max-width:520px;border-radius:12px;margin-top:14px}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--coral);color:#fff;padding:10px 18px;border-radius:12px;max-width:90vw}
-@media(prefers-reduced-motion:reduce){.bulb{animation:none!important}}
+html{background:var(--bg)}
+body{margin:0;min-height:100vh;color:var(--ink);font:500 16px/1.5 Montserrat,system-ui,sans-serif;
+  background:radial-gradient(900px 620px at 84% -6%,rgba(130,20,66,.38),transparent 62%),
+             radial-gradient(820px 620px at -6% 104%,rgba(160,18,76,.32),transparent 60%),
+             linear-gradient(#0a0508,#050205);background-attachment:fixed;overflow-x:hidden}
+
+/* ---------- декор фона ---------- */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg::before{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(90deg,transparent 0 118px,rgba(255,255,255,.018) 118px 120px)}
+.bg::after{content:'';position:absolute;left:0;right:0;bottom:0;height:36vh;
+  background:linear-gradient(transparent,rgba(255,60,150,.05) 55%,rgba(255,60,150,.13))}
+.rose{position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(26px);opacity:.75;
+  background:radial-gradient(circle at 40% 38%,#b8123f,#5c0620 55%,transparent 72%)}
+.rose.a{left:-130px;top:18%}.rose.b{right:-120px;bottom:-60px;width:360px;height:360px}
+.rose.c{right:-90px;top:30%;width:210px;height:210px;opacity:.5}
+.petal{position:absolute;width:44px;height:58px;border-radius:100% 0 100% 0;opacity:.55;
+  background:linear-gradient(135deg,#ff5fa6,#8c1250);animation:drift 9s ease-in-out infinite alternate}
+.petal.p1{left:4%;bottom:6%;transform:rotate(25deg)}
+.petal.p2{left:27%;bottom:3%;transform:rotate(-40deg) scale(.7);animation-delay:-3s}
+.petal.p3{right:6%;bottom:9%;transform:rotate(140deg)}
+.petal.p4{right:23%;bottom:15%;transform:rotate(70deg) scale(.6);animation-delay:-5s}
+.petal.p5{left:46%;bottom:10%;transform:rotate(-100deg) scale(.5);animation-delay:-2s}
+@keyframes drift{to{translate:0 -12px}}
+
+main{position:relative;z-index:1;max-width:1260px;margin:0 auto;padding:30px clamp(16px,3.4vw,44px) 70px}
+
+/* ---------- шапка ---------- */
+.top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.logo{display:flex;flex-direction:column;font-size:clamp(24px,2.6vw,32px);line-height:1.05;letter-spacing:-.3px}
+.logo span{font-weight:500;color:var(--ink)}
+.logo b{font-weight:800;color:var(--rose);text-shadow:0 0 22px rgba(255,79,154,.45)}
+.pilltop{display:flex;align-items:center;gap:12px;padding:15px 34px;border:1px solid var(--line);border-radius:999px;
+  background:rgba(18,7,13,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:600;font-size:17px;
+  box-shadow:0 0 24px rgba(255,60,150,.12)}
+.pilltop svg{width:26px;height:26px;fill:var(--rose);filter:drop-shadow(0 0 7px rgba(255,79,154,.8))}
+.pilltop b{font-weight:700}
+
+/* ---------- сцена ---------- */
+.stage{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);
+  grid-template-areas:"wheel opts" "invite cta";column-gap:clamp(24px,5vw,72px);row-gap:26px;align-items:center;margin-top:22px}
+.wheelcol{grid-area:wheel}
+.optscol{grid-area:opts}
+.invitecol{grid-area:invite;display:flex;justify-content:center}
+.ctacol{grid-area:cta;display:flex;flex-direction:column;align-items:center;gap:10px}
+
+.wheelbox{position:relative;width:min(100%,470px,max(300px,calc(100vh - 300px)));aspect-ratio:1;margin:18px auto 0}
+.rim{position:absolute;inset:0;border-radius:50%;
+  box-shadow:0 0 36px var(--glow),0 0 96px rgba(255,60,150,.25),inset 0 0 0 3px rgba(255,175,212,.85),inset 0 0 0 10px #190912,inset 0 0 0 12px rgba(255,120,180,.55);
+  background:radial-gradient(circle,#120609 60%,#2a0e1b)}
+.spinning .rim{animation:pulse .7s ease-in-out infinite alternate}
+@keyframes pulse{to{box-shadow:0 0 56px rgba(255,60,150,.85),0 0 120px rgba(255,60,150,.4),inset 0 0 0 3px rgba(255,200,226,.95),inset 0 0 0 10px #190912,inset 0 0 0 12px rgba(255,140,190,.8)}}
+.wheel{position:absolute;inset:4.6%;border-radius:50%;overflow:hidden;
+  transition:transform 4.5s cubic-bezier(.12,.7,.1,1);
+  background:radial-gradient(circle,rgba(255,255,255,.2) 0,transparent 62%),
+    conic-gradient(#f394b7 0 60deg,#1b0c14 0 120deg,#f394b7 0 180deg,#1b0c14 0 240deg,#f394b7 0 300deg,#1b0c14 0 360deg)}
+.wheel b{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px;text-align:center;line-height:48px;font:800 34px Montserrat,sans-serif;transition:transform 4.5s cubic-bezier(.12,.7,.1,1)}
+.wheel b.lt{color:#3a1224}
+.wheel b.dk{color:#ffc9df;text-shadow:0 0 12px rgba(255,120,180,.5)}
+.hub{position:absolute;left:50%;top:50%;width:17%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#2a1018,#070305 70%);
+  box-shadow:inset 0 0 0 3px rgba(255,120,180,.6),0 0 18px rgba(0,0,0,.85),0 0 16px rgba(255,60,150,.35)}
+.hub::after{content:'';position:absolute;left:50%;top:50%;width:6%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:var(--rose2)}
+.pointer{position:absolute;left:50%;top:-4.4%;width:11.5%;aspect-ratio:1.08;transform:translateX(-50%);z-index:3;
+  background:rgba(255,235,245,.92);clip-path:polygon(0 0,100% 0,50% 100%);filter:drop-shadow(0 0 12px rgba(255,80,160,.95))}
+.pointer::after{content:'';position:absolute;inset:7% 11% 17%;background:linear-gradient(#ff8cc0,#ff2f86);clip-path:polygon(0 0,100% 0,50% 100%)}
+.plate{position:relative;width:84%;height:34px;margin:-2px auto 0;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(255,110,175,.6),rgba(45,12,28,.95) 58%,transparent 72%);
+  box-shadow:0 22px 46px rgba(255,60,150,.28)}
+
+/* ---------- варианты ---------- */
+ol{margin:0;padding:0;list-style:none;display:grid;gap:12px}
+ol li{display:flex;align-items:center;gap:18px;min-height:60px;padding:8px 24px;border:1px solid var(--line);border-radius:999px;
+  background:linear-gradient(90deg,rgba(42,15,30,.86),rgba(22,8,16,.86));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  transition:opacity .4s,box-shadow .4s,border-color .4s,background .4s}
+ol li .n{flex:0 0 30px;text-align:center;font-weight:700;font-size:28px;color:var(--rose);text-shadow:0 0 14px rgba(255,79,154,.45)}
+ol li .t{flex:1;font-weight:500;font-size:clamp(14px,1.3vw,17px);line-height:1.35}
+ol li .ic{flex:0 0 36px;text-align:center;font-size:25px;filter:grayscale(1) sepia(1) hue-rotate(-62deg) saturate(3.4) brightness(1.25)}
+ol.hasWin li:not(.win){opacity:.42}
+ol li.win{border-color:var(--rose2);background:linear-gradient(90deg,rgba(125,22,72,.6),rgba(62,12,40,.75));
+  box-shadow:0 0 26px var(--glow),inset 0 0 20px rgba(255,70,150,.2)}
+
+/* ---------- кнопки ---------- */
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--rose2);outline-offset:3px}
+button:disabled{opacity:.55;cursor:default}
+.cta{display:flex;align-items:center;justify-content:center;gap:14px;width:min(100%,380px);height:70px;border-radius:999px;
+  border:1.5px solid rgba(255,196,224,.8);color:#fff;font-weight:700;font-size:21px;
+  background:linear-gradient(180deg,#ff8cc0 0%,#e8458d 50%,#a82468 100%);
+  box-shadow:0 0 36px var(--glow),inset 0 2px 0 rgba(255,255,255,.4),inset 0 -12px 22px rgba(80,0,40,.32);
+  transition:filter .15s,transform .12s}
+.cta:hover:not(:disabled){filter:brightness(1.08)}
+.cta:active:not(:disabled){transform:scale(.98)}
+.cta svg{width:24px;height:24px;fill:#fff}
+.invite{display:inline-flex;align-items:center;gap:16px;height:58px;padding:0 26px;border-radius:999px;border:1px solid rgba(255,105,170,.55);
+  background:rgba(20,8,14,.78);color:var(--ink);font-weight:600;font-size:17px;box-shadow:0 0 20px rgba(255,60,150,.18);transition:box-shadow .15s,border-color .15s}
+.invite:hover{border-color:var(--rose2);box-shadow:0 0 28px rgba(255,60,150,.4)}
+.invite svg{width:24px;height:24px;stroke:var(--rose);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ghost{padding:14px 24px;border-radius:999px;border:1px solid var(--line);background:rgba(20,8,14,.7);color:var(--ink);font-weight:600;font-size:15px}
+#status{margin:0;min-height:1.5em;color:var(--rose2);font-size:15px;text-align:center}
+#peers{margin:26px 0 0;text-align:center;color:var(--mut);font-size:14px}
+
+/* ---------- истории ---------- */
+#feed{max-width:860px;margin:10px auto 0}
+.round{margin-top:18px;padding:24px 26px;border:1px solid var(--line);border-radius:26px;
+  background:linear-gradient(160deg,rgba(36,13,26,.9),rgba(16,6,12,.9));box-shadow:0 0 30px rgba(255,60,150,.08)}
+.round h2{margin:0 0 12px;font-size:14px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--rose)}
+.round p{margin:0;white-space:pre-wrap;max-width:68ch;font-size:17px;line-height:1.65}
+.round img{display:block;width:100%;max-width:540px;margin-top:18px;border-radius:18px;border:1px solid var(--line);box-shadow:0 0 28px rgba(255,60,150,.25)}
+.dl{display:inline-block;margin-top:12px;color:var(--rose2);font-size:15px;font-weight:600}
+.tools{display:flex;justify-content:center;margin-top:22px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9;max-width:92vw;padding:12px 20px;border-radius:14px;
+  background:#1d0a14;border:1px solid var(--rose);color:var(--ink);box-shadow:0 0 24px var(--glow);text-align:center}
+
+/* ---------- телефон ---------- */
+@media(max-width:860px){
+  .stage{grid-template-columns:1fr;grid-template-areas:"wheel" "opts" "cta" "invite";row-gap:22px}
+  .wheelbox{width:min(100%,400px)}
+  .pilltop{padding:12px 22px;font-size:15px}
+  .pilltop svg{width:22px;height:22px}
+  ol li{min-height:54px;padding:6px 18px;gap:12px}
+  ol li .n{font-size:24px;flex-basis:24px}
+  ol li .ic{font-size:22px;flex-basis:30px}
+  .cta{height:64px;font-size:19px}
+  .wheel b{width:40px;height:40px;margin:-20px;line-height:40px;font-size:28px}
+}
+@media(prefers-reduced-motion:reduce){.petal,.spinning .rim{animation:none!important}}
 </style>
 </head>
 <body>
+<div class="bg" aria-hidden="true">
+  <i class="rose a"></i><i class="rose b"></i><i class="rose c"></i>
+  <i class="petal p1"></i><i class="petal p2"></i><i class="petal p3"></i><i class="petal p4"></i><i class="petal p5"></i>
+</div>
+
 <main>
-  <header><h1>Любовная фортуна</h1><span id="peers">Подключаемся… (если сервер спал, до минуты)</span></header>
-  <div id="roundTitle"></div>
+  <header class="top">
+    <div class="logo"><span>Любовная</span><b>Фортуна</b></div>
+    <div class="pilltop" id="roundPill">
+      <span id="rpN">Раунд 1 из 5:</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1 4.6 2.6h2C14 6 15.600 5 17.600 5 21 5 23.100 8.400 21.600 11.800 19.500 16.400 12 21 12 21z"/></svg>
+      <b id="rpT">Кто мы</b>
+    </div>
+  </header>
+
   <section class="stage">
-    <div class="wheelbox" id="box"><div class="pointer"></div><div class="wheel" id="wheel"></div></div>
-    <div>
-      <ol id="opts"></ol>
-      <div class="bar">
-        <button class="btn" id="spin">Крутить колесо</button>
-        <button class="btn" id="next" hidden>Следующий раунд</button>
-        <button class="btn" id="again" hidden>Играть заново</button>
+    <div class="wheelcol">
+      <div class="wheelbox" id="box">
+        <div class="rim"></div>
+        <div class="wheel" id="wheel"></div>
+        <div class="hub"></div>
+        <div class="pointer"></div>
       </div>
+      <div class="plate"></div>
+    </div>
+
+    <div class="optscol"><ol id="opts"></ol></div>
+
+    <div class="invitecol">
+      <button class="invite" id="invite">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><path d="M2.500 20c.4-3.600 3.200-5.800 6.500-5.800s6.100 2.200 6.500 5.800"/><path d="M19 7v6M16 10h6"/></svg>
+        <span>Пригласить Аню</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <div class="ctacol">
+      <button class="cta" id="spin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.500v15l12-7.500z"/></svg><span id="spinTxt">Крутить колесо</span></button>
+      <button class="cta" id="next" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.500v15l12-7.500z"/></svg><span>Следующий раунд</span></button>
+      <button class="cta" id="again" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.500v15l12-7.500z"/></svg><span>Играть заново</span></button>
       <p id="status"></p>
     </div>
   </section>
+
+  <p id="peers">Подключаемся… (если сервер спал, до минуты)</p>
   <div id="feed"></div>
-  <div class="bar"><button class="btn ghost" id="invite">Пригласить Аню</button>
-    <button class="btn ghost" id="copy" hidden>Скопировать всю историю</button></div>
+  <div class="tools"><button class="ghost" id="copy" hidden>Скопировать всю историю</button></div>
 </main>
 <div id="toast" hidden></div>
+
 <script>
 const $ = s => document.querySelector(s);
 const code = new URLSearchParams(location.search).get('code') || '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let ROUNDS = [], S = null, ws, angle = 0, until = 0, toastTimer;
 
-// лампочки и цифры на колесе
+// цифры на колесе: на розовых секторах тёмные, на чёрных светлые
 const box = $('#box'), wheel = $('#wheel');
-const bulbs = [], nums = [];
-for (let i = 0; i < 20; i++) { const b = document.createElement('i'); b.className = 'bulb'; box.appendChild(b); bulbs.push(b); }
-for (let i = 0; i < 6; i++) { const n = document.createElement('b'); n.textContent = i + 1; wheel.appendChild(n); nums.push(n); }
-function layout() {
+const nums = [];
+for (let i = 0; i < 6; i++) { const n = document.createElement('b'); n.textContent = i + 1; n.className = i % 2 ? 'dk' : 'lt'; wheel.appendChild(n); nums.push(n); }
+// цифры едут по кругу вместе с колесом, но сами остаются ровными (контр-поворот на угол колеса)
+function layout(animate) {
   const w = box.offsetWidth;
-  bulbs.forEach((b, i) => { b.style.transform = `rotate(${i * 18}deg) translateY(${-w * 0.47}px)`; });
-  nums.forEach((n, i) => { const a = i * 60 + 30; n.style.transform = `rotate(${a}deg) translateY(${-w * 0.28}px) rotate(${-a}deg)`; });
+  if (!animate) nums.forEach(n => n.style.transition = 'none');
+  nums.forEach((n, i) => { const a = i * 60 + 30; n.style.transform = `rotate(${a}deg) translateY(${-w * 0.29}px) rotate(${-a}deg) rotate(${-angle}deg)`; });
+  if (!animate) { void box.offsetWidth; nums.forEach(n => n.style.transition = ''); }
 }
-layout(); addEventListener('resize', layout);
+addEventListener('resize', () => layout(false));
 
+layout(false);
 const later = fn => setTimeout(fn, Math.max(0, until - Date.now()));
 const toast = t => { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 5000); };
 
@@ -92,12 +219,14 @@ function turn(index) {
   const target = 360 - (index * 60 + 30), cur = ((angle % 360) + 360) % 360;
   angle += 360 * 5 + ((target - cur) + 360) % 360;
   wheel.style.transform = `rotate(${angle}deg)`;
+  layout(true);
 }
 function placeWheel() {
   const res = S.results[S.round];
   wheel.style.transition = 'none';
   angle = res ? 360 - (res.index * 60 + 30) : 0;
   wheel.style.transform = `rotate(${angle}deg)`;
+  layout(false);
   void wheel.offsetWidth; wheel.style.transition = '';
 }
 
@@ -121,22 +250,27 @@ function render() {
   if (!S) return;
   const r = S.round, rd = ROUNDS[r], revealed = Date.now() >= until, res = S.results[r];
   const done = !!res && revealed, idle = !S.busy;
-  $('#roundTitle').textContent = `Раунд ${r + 1} из ${ROUNDS.length}: ${rd.icon} ${rd.title}`;
-  $('#opts').innerHTML = rd.options.map((o, i) => `<li class="${done && res.index === i ? 'win' : ''}">${esc(o)}</li>`).join('');
+  $('#rpN').textContent = `Раунд ${r + 1} из ${ROUNDS.length}:`;
+  $('#rpT').textContent = rd.title;
+  const opts = $('#opts');
+  opts.className = done ? 'hasWin' : '';
+  opts.innerHTML = rd.options.map((o, i) =>
+    `<li class="${done && res.index === i ? 'win' : ''}"><span class="n">${i + 1}</span><span class="t">${esc(o)}</span><span class="ic">${esc((rd.icons && rd.icons[i]) || '♥')}</span></li>`).join('');
   box.classList.toggle('spinning', S.busy);
+  $('#spin').hidden = done && idle;
   $('#spin').disabled = !(idle && !res);
+  $('#spinTxt').textContent = S.busy ? 'Фортуна колдует…' : 'Крутить колесо';
   $('#next').hidden = !(done && idle && r < ROUNDS.length - 1);
   $('#again').hidden = !(done && idle && r === ROUNDS.length - 1);
   $('#status').textContent = !S.busy ? '' : !revealed ? 'Колесо крутится…' : !S.story[r] ? 'Фортуна пишет вашу историю…' : 'Рисуем вас в этой сцене…';
   let html = '';
   for (let i = r; i >= 0; i--) {
     if (!S.results[i] || (i === r && !revealed)) continue;
-    html += `<article class="round"><h2>${ROUNDS[i].icon} ${esc(ROUNDS[i].title)}: ${esc(S.results[i].label)}</h2>${S.story[i] ? `<p>${esc(S.story[i])}</p>` : ''}${S.images[i] ? `<img src="${esc(S.images[i])}" alt="Дима и Аня в сцене раунда ${i + 1}"><a class="dl" href="${esc(S.images[i])}" download>Сохранить картинку</a>` : ''}</article>`;
+    html += `<article class="round"><h2>${esc(ROUNDS[i].title)}: ${esc(S.results[i].label)}</h2>${S.story[i] ? `<p>${esc(S.story[i])}</p>` : ''}${S.images[i] ? `<img src="${esc(S.images[i])}" alt="Дима и Аня в сцене раунда ${i + 1}"><a class="dl" href="${esc(S.images[i])}" download>Сохранить картинку</a>` : ''}</article>`;
   }
   $('#feed').innerHTML = html;
   $('#copy').hidden = !S.story.some(Boolean);
 }
-
 
 const act = type => () => ws.readyState === 1 && ws.send(JSON.stringify({ type }));
 $('#spin').onclick = act('spin');

@@ -60,7 +60,7 @@ const SYSTEM = `Ты автор историй для игры «Любовна�
 4. Выпавший результат вплетай в сюжет естественно, даже если он странный. Кроме него не добавляй случайных персонажей, предметов и событий, не связанных с историей. Новый персонаж: не больше одного за часть, и он нужен сюжету.
 5. Ситуации неожиданные, забавные и оригинальные, но понятные и правдоподобные внутри выдуманного мира.
 6. Действия героев конкретные. Никаких общих фраз вроде «они пережили незабываемое приключение».
-7. Живые диалоги (3–4 реплики через тире), забавные недоразумения, неожиданные повороты и романтика там, где она уместна.
+7. Живые диалоги (3–4 реплики героев), забавные недоразумения, неожиданные повороты и романтика там, где она уместна.
 8. Не перегружай историю: лучше одна хорошо проработанная сцена, чем куча событий.
 9. Герои пара: их взаимодействие, общие решения и эмоции важная часть истории.
 10. Не повторяй сюжетные ходы и шутки из прошлых частей, а развивай их.
@@ -70,17 +70,41 @@ const SYSTEM = `Ты автор историй для игры «Любовна�
 ФОРМАТ ЧАСТИ: 140–190 слов, два коротких абзаца. Каждая часть, кроме последней, заканчивается крючком, после которого хочется крутить колесо дальше.
 
 Ответь ТОЛЬКО JSON без пояснений и без markdown:
-{"beat":"одна короткая строка: что произошло в этой части","story":"текст части","scene":"одно предложение по-английски: что видно на картинке, обязательно мужчина и женщина, яркое действие, место, без текста и без имён"}
-Двойные кавычки внутри текста не используй, для цитат бери «ёлочки».`;
+{"beat":"одна короткая строка: что произошло в этой части","parts":[{"who":"narrator","text":"..."},{"who":"dima","text":"..."},{"who":"anya","text":"..."}],"scene":"одно предложение по-английски: что видно на картинке, обязательно мужчина и женщина, яркое действие, место, без текста и без имён"}
+Правила для parts (текст раскрашивается по говорящему, поэтому строго):
+- who только narrator, dima или anya. Слова героя пишет dima или anya, всё остальное (описание, действия, слова вроде «сказал Дима») пишет narrator.
+- В text реплики героя только сами слова: без тире, без имени и без «сказал».
+- 8–14 записей, рассказчик и реплики чередуются.
+- Двойные кавычки внутри text не используй, для цитат бери «ёлочки».`;
+
+// ---------- реплики по говорящим ----------
+const NAMES = { narrator: 'Рассказчик', dima: 'Дима', anya: 'Аня' };
+const normWho = w => {
+  const x = String(w || '').toLowerCase();
+  if (/дим|dima/.test(x)) return 'dima';
+  if (/ан[яин]|anya|anna/.test(x)) return 'anya';
+  return 'narrator';
+};
+const cleanParts = list => (Array.isArray(list) ? list : [])
+  .map(p => ({ who: normWho(p && p.who), text: String((p && p.text) || '').replace(/\s+/g, ' ').trim().slice(0, 400) }))
+  .filter(p => p.text);
+// Простой текст (для копирования и для следующих частей): рассказчик как есть, герои с подписью
+const partsToText = parts => parts.map(p => (p.who === 'narrator' ? p.text : `— ${NAMES[p.who]}: ${p.text}`)).join('\n');
 
 // ---------- состояние и рассылка ----------
-const fresh = () => ({ round: 0, results: [], story: [], images: [], busy: false });
+const fresh = () => ({ round: 0, results: [], story: [], parts: [], images: [], busy: false });
 let state = fresh();
 let beats = []; // короткие пересказы частей: так история не путается
 const clients = new Set();
 const send = (ws, m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
 const broadcast = m => clients.forEach(ws => send(ws, m));
-const fullState = () => ({ type: 'state', rounds: ROUNDS, state });
+// Варианты, исключённые из Фортуны (по раундам). Общие для обоих игроков и сохраняются при «Играть заново».
+const cleanEx = list => ROUNDS.map((rd, r) => {
+  const a = Array.isArray(list && list[r]) ? [...new Set(list[r].filter(i => Number.isInteger(i) && i >= 0 && i < rd.options.length))] : [];
+  return a.length >= rd.options.length ? [] : a; // хотя бы один вариант должен остаться
+});
+let excluded = cleanEx([]);
+const fullState = () => ({ type: 'state', rounds: ROUNDS, state, excluded });
 
 // ---------- Cloudflare Workers AI ----------
 async function cf(model, body) {
@@ -122,19 +146,20 @@ async function writeStory() {
   const prompt = `Жанр этой истории: ${genre}. Держись его во всех частях.\n\nЧто выпало по раундам:\n${picks}\n\nКратко, что было раньше:\n${before}\n\n${prev}Напиши часть ${r + 1} из ${ROUNDS.length}.\nЗадача части: ${role}\nОбязательно используй то, что выпало сейчас: «${ROUNDS[r].title}: ${state.results[r].label}». Остальное выпавшее держи в фоне, не перечисляй всё подряд.`;
   let text = '';
   for (let i = 0; i < 2; i++) {
-    text = await chat(SYSTEM, prompt, 1100);
+    text = await chat(SYSTEM, prompt, 1400);
     const m = text.match(/\{[\s\S]*\}/);
     const o = m && parseJson(m[0]);
-    if (o && o.story) {
-      const story = String(o.story).trim();
-      return { story, scene: String(o.scene || '').trim(), beat: String(o.beat || '').trim() || story.slice(0, 120) };
+    const parts = o ? cleanParts(o.parts && o.parts.length ? o.parts : (o.story ? [{ who: 'narrator', text: o.story }] : [])) : [];
+    if (parts.length) {
+      const story = partsToText(parts);
+      return { parts, story, scene: String(o.scene || '').trim(), beat: String(o.beat || '').trim() || story.slice(0, 120) };
     }
     console.warn(`Попытка ${i + 1}: ответ не в формате JSON`);
   }
   // запасной вариант: берём текст как есть
-  const story = text.replace(/^[\s{]*"?(beat|story)"?\s*:\s*"/i, '').replace(/",?\s*"(story|scene)"[\s\S]*$/i, '').replace(/["}\s]+$/, '').trim();
+  const story = text.replace(/^[\s{]*"?(beat|story|parts)"?\s*:\s*["\[]/i, '').replace(/",?\s*"(story|scene|parts)"[\s\S]*$/i, '').replace(/["}\]\s]+$/, '').trim();
   if (!story) throw new Error('Модель вернула пустой ответ');
-  return { story, scene: '', beat: story.slice(0, 120) };
+  return { parts: [{ who: 'narrator', text: story }], story, scene: '', beat: story.slice(0, 120) };
 }
 
 // ---------- картинки ----------
@@ -200,15 +225,18 @@ async function makeImage(scene, r) {
 // ---------- ход игры ----------
 async function spin() {
   const r = state.round;
-  const index = crypto.randomInt(6);
+  // случайный выбор только среди вариантов, не исключённых из Фортуны
+  const enabled = ROUNDS[r].options.map((_, i) => i).filter(i => !excluded[r].includes(i));
+  const index = enabled[crypto.randomInt(enabled.length)];
   state.busy = true;
   state.results[r] = { index, label: ROUNDS[r].options[index] };
   broadcast({ type: 'spin', round: r, index, label: state.results[r].label });
   try {
-    const { story, scene, beat } = await writeStory();
+    const { parts, story, scene, beat } = await writeStory();
     state.story[r] = story;
+    state.parts[r] = parts;
     beats[r] = beat;
-    broadcast({ type: 'story', round: r, story });
+    broadcast({ type: 'story', round: r, story, parts });
     try {
       const { url, note } = await makeImage(scene, r);
       state.images[r] = url;
@@ -254,6 +282,19 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => { clients.delete(ws); broadcast({ type: 'peers', n: clients.size }); });
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
+    if (m.type === 'toggle') {
+      const r = m.round, i = m.index;
+      if (!Number.isInteger(r) || !Number.isInteger(i) || !ROUNDS[r] || i < 0 || i >= ROUNDS[r].options.length) return;
+      const list = excluded[r], at = list.indexOf(i);
+      if (at >= 0) list.splice(at, 1);
+      else if (list.length < ROUNDS[r].options.length - 1) list.push(i);
+      else return send(ws, { type: 'error', message: 'В каждом раунде должен остаться хотя бы один вариант.' });
+      return broadcast({ type: 'excluded', excluded });
+    }
+    if (m.type === 'restore') { // после перезапуска сервера возвращаем сохранённое в браузере
+      if (!excluded.some(a => a.length)) { excluded = cleanEx(m.excluded); broadcast({ type: 'excluded', excluded }); }
+      return;
+    }
     if (state.busy) return;
     const res = state.results[state.round];
     if (m.type === 'spin' && !res) spin();

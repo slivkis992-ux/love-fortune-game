@@ -90,6 +90,14 @@ ol li{display:flex;align-items:center;gap:18px;min-height:60px;padding:8px 24px;
 ol li .n{flex:0 0 30px;text-align:center;font-weight:700;font-size:28px;color:var(--rose);text-shadow:0 0 14px rgba(255,79,154,.45)}
 ol li .t{flex:1;font-weight:500;font-size:clamp(14px,1.3vw,17px);line-height:1.35}
 ol li .ic{flex:0 0 36px;text-align:center;font-size:25px;filter:grayscale(1) sepia(1) hue-rotate(-62deg) saturate(3.4) brightness(1.25)}
+ol li .ex{flex:0 0 38px;height:38px;padding:0;border-radius:50%;border:1px solid rgba(255,105,170,.5);background:rgba(20,8,14,.85);color:var(--rose2);font-size:17px;line-height:1;display:grid;place-items:center;transition:background .15s,border-color .15s}
+ol li .ex:hover{background:rgba(120,22,72,.6);border-color:var(--rose2)}
+ol li.off{opacity:.55;border-style:dashed;border-color:rgba(255,105,170,.22);background:rgba(18,8,14,.7)}
+ol li.off .t{text-decoration:line-through;color:var(--mut)}
+ol li.off .t::after{content:' · исключено';display:inline-block;margin-left:6px;font-size:.78em;font-weight:600;color:var(--rose2)}
+ol li.off .n{color:#7a4a60;text-shadow:none}
+ol li.off .ic{opacity:.45}
+.wheel b.off{opacity:.3}
 ol.hasWin li:not(.win){opacity:.42}
 ol li.win{border-color:var(--rose2);background:linear-gradient(90deg,rgba(125,22,72,.6),rgba(62,12,40,.75));
   box-shadow:0 0 26px var(--glow),inset 0 0 20px rgba(255,70,150,.2)}
@@ -120,6 +128,11 @@ button:disabled{opacity:.55;cursor:default}
   background:linear-gradient(160deg,rgba(36,13,26,.9),rgba(16,6,12,.9));box-shadow:0 0 30px rgba(255,60,150,.08)}
 .round h2{margin:0 0 12px;font-size:14px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--rose)}
 .round p{margin:0;white-space:pre-wrap;max-width:68ch;font-size:17px;line-height:1.65}
+.round p+p{margin-top:10px}
+.round p b{font-weight:700}
+.s-n{color:#fff}
+.s-dima{color:#5aaeff}
+.s-anya{color:#ff6fae}
 .round img{display:block;width:100%;max-width:540px;margin-top:18px;border-radius:18px;border:1px solid var(--line);box-shadow:0 0 28px rgba(255,60,150,.25)}
 .dl{display:inline-block;margin-top:12px;color:var(--rose2);font-size:15px;font-weight:600}
 .tools{display:flex;justify-content:center;margin-top:22px}
@@ -135,6 +148,7 @@ button:disabled{opacity:.55;cursor:default}
   ol li{min-height:54px;padding:6px 18px;gap:12px}
   ol li .n{font-size:24px;flex-basis:24px}
   ol li .ic{font-size:22px;flex-basis:30px}
+  ol li .ex{flex-basis:34px;height:34px}
   .cta{height:64px;font-size:19px}
   .wheel b{width:40px;height:40px;margin:-20px;line-height:40px;font-size:28px}
 }
@@ -149,7 +163,7 @@ button:disabled{opacity:.55;cursor:default}
 
 <main>
   <header class="top">
-    <div class="logo"><span></span><b></b></div>
+    <div class="logo"><span>Любовная</span><b>Фортуна</b></div>
     <div class="pilltop" id="roundPill">
       <span id="rpN">Раунд 1 из 5:</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1 4.6 2.6h2C14 6 15.600 5 17.600 5 21 5 23.100 8.400 21.600 11.800 19.500 16.400 12 21 12 21z"/></svg>
@@ -196,7 +210,11 @@ button:disabled{opacity:.55;cursor:default}
 const $ = s => document.querySelector(s);
 const code = new URLSearchParams(location.search).get('code') || '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let ROUNDS = [], S = null, ws, angle = 0, until = 0, toastTimer;
+let ROUNDS = [], S = null, EX = [], ws, angle = 0, until = 0, toastTimer;
+const EXK = 'lf-excluded';
+const loadEx = () => { try { const a = JSON.parse(localStorage.getItem(EXK)); return Array.isArray(a) ? a : []; } catch { return []; } };
+const saveEx = () => { try { localStorage.setItem(EXK, JSON.stringify(EX)); } catch {} };
+const hasEx = a => Array.isArray(a) && a.some(x => x && x.length);
 
 // цифры на колесе: на розовых секторах тёмные, на чёрных светлые
 const box = $('#box'), wheel = $('#wheel');
@@ -236,14 +254,32 @@ function connect() {
   ws.onclose = ev => { if (ev.code === 4001) $('#peers').textContent = 'Неверный код. Открой ссылку с ?code=…'; else { $('#peers').textContent = 'Переподключаемся…'; setTimeout(connect, 2000); } };
 }
 function handle(m) {
-  if (m.type === 'state') { ROUNDS = m.rounds; S = m.state; until = 0; placeWheel(); render(); }
+  if (m.type === 'state') {
+    ROUNDS = m.rounds; S = m.state; EX = m.excluded || []; until = 0; placeWheel(); render();
+    // сервер мог перезапуститься и забыть исключения: возвращаем сохранённые в этом браузере
+    const local = loadEx();
+    if (!hasEx(EX) && hasEx(local)) ws.send(JSON.stringify({ type: 'restore', excluded: local }));
+    else saveEx();
+  }
   else if (!S) return;
   else if (m.type === 'peers') $('#peers').textContent = m.n > 1 ? 'Вы вдвоём 💘' : 'Ждём второго игрока…';
   else if (m.type === 'spin') { S.results[m.round] = { index: m.index, label: m.label }; S.busy = true; until = Date.now() + 4600; turn(m.index); render(); later(render); }
-  else if (m.type === 'story') { S.story[m.round] = m.story; later(render); }
+  else if (m.type === 'excluded') { EX = m.excluded; saveEx(); render(); }
+  else if (m.type === 'story') { S.story[m.round] = m.story; (S.parts = S.parts || [])[m.round] = m.parts; later(render); }
   else if (m.type === 'image') { S.images[m.round] = m.url; later(render); }
   else if (m.type === 'idle') { S.busy = false; later(render); }
   else if (m.type === 'error') toast(m.message);
+}
+
+// Раскраска по говорящему: Дима синий, Аня розовый, рассказчик белый. Берём parts, а если их нет (старые истории), разбираем строки вида «— Дима: …».
+function storyHtml(i) {
+  const parts = S.parts && S.parts[i];
+  const items = parts && parts.length ? parts : String(S.story[i] || '').split('\n').map(line => {
+    const m = line.match(/^— (Дима|Аня): ([\s\S]*)$/);
+    return m ? { who: m[1] === 'Дима' ? 'dima' : 'anya', text: m[2] } : { who: 'narrator', text: line };
+  });
+  return items.filter(p => p.text && p.text.trim()).map(p => p.who === 'dima' ? `<p class="s-dima"><b>Дима:</b> ${esc(p.text)}</p>`
+    : p.who === 'anya' ? `<p class="s-anya"><b>Аня:</b> ${esc(p.text)}</p>` : `<p class="s-n">${esc(p.text)}</p>`).join('');
 }
 
 function render() {
@@ -254,8 +290,12 @@ function render() {
   $('#rpT').textContent = rd.title;
   const opts = $('#opts');
   opts.className = done ? 'hasWin' : '';
-  opts.innerHTML = rd.options.map((o, i) =>
-    `<li class="${done && res.index === i ? 'win' : ''}"><span class="n">${i + 1}</span><span class="t">${esc(o)}</span><span class="ic">${esc((rd.icons && rd.icons[i]) || '♥')}</span></li>`).join('');
+  const exr = EX[r] || [];
+  opts.innerHTML = rd.options.map((o, i) => {
+    const off = exr.includes(i);
+    return `<li class="${(done && res.index === i ? 'win ' : '') + (off ? 'off' : '')}"><span class="n">${i + 1}</span><span class="t">${esc(o)}</span><span class="ic">${esc((rd.icons && rd.icons[i]) || '♥')}</span><button type="button" class="ex" data-i="${i}" aria-pressed="${off}" title="${off ? 'Вернуть в Фортуну' : 'Исключить из Фортуны'}" aria-label="${(off ? 'Вернуть вариант ' : 'Исключить вариант ') + (i + 1)}">${off ? '↺' : '✕'}</button></li>`;
+  }).join('');
+  nums.forEach((n, i) => n.classList.toggle('off', exr.includes(i)));
   box.classList.toggle('spinning', S.busy);
   $('#spin').hidden = done && idle;
   $('#spin').disabled = !(idle && !res);
@@ -266,12 +306,16 @@ function render() {
   let html = '';
   for (let i = r; i >= 0; i--) {
     if (!S.results[i] || (i === r && !revealed)) continue;
-    html += `<article class="round"><h2>${esc(ROUNDS[i].title)}: ${esc(S.results[i].label)}</h2>${S.story[i] ? `<p>${esc(S.story[i])}</p>` : ''}${S.images[i] ? `<img src="${esc(S.images[i])}" alt="Дима и Аня в сцене раунда ${i + 1}"><a class="dl" href="${esc(S.images[i])}" download>Сохранить картинку</a>` : ''}</article>`;
+    html += `<article class="round"><h2>${esc(ROUNDS[i].title)}: ${esc(S.results[i].label)}</h2>${S.story[i] ? storyHtml(i) : ''}${S.images[i] ? `<img src="${esc(S.images[i])}" alt="Дима и Аня в сцене раунда ${i + 1}"><a class="dl" href="${esc(S.images[i])}" download>Сохранить картинку</a>` : ''}</article>`;
   }
   $('#feed').innerHTML = html;
   $('#copy').hidden = !S.story.some(Boolean);
 }
 
+$('#opts').addEventListener('click', e => {
+  const b = e.target.closest('.ex');
+  if (b && S && ws.readyState === 1) ws.send(JSON.stringify({ type: 'toggle', round: S.round, index: +b.dataset.i }));
+});
 const act = type => () => ws.readyState === 1 && ws.send(JSON.stringify({ type }));
 $('#spin').onclick = act('spin');
 $('#next').onclick = act('next');

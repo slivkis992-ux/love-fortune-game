@@ -24,11 +24,11 @@ const GEN_DIR = path.join(__dirname, 'public', 'generated');
 fs.mkdirSync(GEN_DIR, { recursive: true });
 
 const ROUNDS = [
-{ title: 'Кто мы', icon: '🎭', options: ['Повара-соперники на кулинарном шоу', 'Охотники за сокровищами с картой от бабушки', 'Дрессировщики, потерявшие всех зверей', 'Агенты, охраняющие самый важный торт в мире', 'Пара из будущего, застрявшая в 2026-м', 'Участники реалити-шоу «Остаться живыми»'] },
-{ title: 'Где мы', icon: '📍', options: ['Вокзал ночью', 'Супермаркет за минуту до закрытия', 'Замок с привидениями', 'Крыша небоскрёба во время грозы', 'Отель из которого невозможно выйти', 'Пляж, где всё слишком подозрительно'] },
-{ title: 'Что пошло не так', icon: '💥', options: ['Пропал единственный ключ', 'Нас приняли за бывших друг друга', 'Мы надели парные костюмы персонажей на Хэллоуин', 'Всё вокруг заговорило рифмами', 'Закончился интернет, надо выжить офлайн', 'Выяснилось, что один из нас здесь самый главный'] },
-{ title: 'Поворот', icon: '🌪', options: ['Вылезает клоун из первой части', 'Приходится танцевать, чтобы пройти дальше', 'Объявляется злодей, которого мы сами создали', 'Время повторяется по кругу', 'Один из нас случайно становится злодеем истории', 'Появляется говорящий кот, который всё знает'] },
-{ title: 'Финал', icon: '🏆', options: ['Оскар за лучшую пару', 'И всё-таки это было лучшее свидание: несмотря на весь хаос, вечер оказался незабываемым', 'Премия «Лучшая драка за последний круассан»', 'Мы неожиданно попадаем во вселенную LEGO где нас поручают совершено новое задание', 'Появляется таинственный колдун и превращает весь мир в пластилин, включая нас. Теперь мы — пластилиновые фигурки и пытаемся найти способ вернуть себе прежний облик'] },
+  { title: 'Кто мы', icon: '🎭', icons: ['🧑‍🍳', '🗺️', '🐾', '🕶️', '⏳', '🎬'], options: ['Повара-соперники на кулинарном шоу', 'Охотники за сокровищами с картой от бабушки', 'Дрессировщики, потерявшие всех зверей', 'Агенты, охраняющие самый важный торт в мире', 'Пара из будущего, застрявшая в 2026-м', 'Участники реалити-шоу «Остаться живыми»'] },
+  { title: 'Где мы', icon: '📍', icons: ['🚉', '🛒', '🏰', '⛈️', '🎡', '🏖️'], options: ['Вокзал ночью', 'Супермаркет за минуту до закрытия', 'Замок с привидениями-бюрократами', 'Крыша небоскрёба во время грозы', 'Ярмарка с каруселями и сладкой ватой', 'Пляж, где всё слишком подозрительно'] },
+  { title: 'Что пошло не так', icon: '💥', icons: ['🔑', '🎭', '🎃', '🗣️', '📵', '👑'], options: ['Пропал единственный ключ', 'Нас приняли за бывших друг друга', 'Мы надели парные костюмы на Хэллоуин', 'Всё вокруг заговорило рифмами', 'Закончился интернет, надо выжить офлайн', 'Выяснилось, что один из нас здесь самый главный'] },
+  { title: 'Поворот', icon: '🌪', icons: ['🤡', '💃', '🦹', '🔁', '🔄', '🐈'], options: ['Вылезает клоун из первой части', 'Приходится танцевать, чтобы пройти дальше', 'Объявляется злодей, которого мы сами создали', 'Время повторяется по кругу', 'Дима и Аня меняются ролями', 'Появляется говорящий кот, который всё знает'] },
+  { title: 'Финал', icon: '🏆', icons: ['🏆', '📺', '🥐', '🎞️', '🎖️', '🌅'], options: ['Оскар за лучшую пару', 'Сериал на 8 сезонов', 'Премия «Лучшая драка за последний круассан»', 'Сиквел обязателен', 'Награда «Самые странные герои года»', 'Открытый финал, продолжение завтра'] },
 ];
 
 // Расскажи сказочнику, какие вы. Правь под себя: чем конкретнее, тем живее истории.
@@ -77,6 +77,34 @@ const SYSTEM = `Ты автор историй для игры «Любовна�
 - 8–14 записей, рассказчик и реплики чередуются.
 - Двойные кавычки внутри text не используй, для цитат бери «ёлочки».`;
 
+// ---------- свои тексты вариантов (редактируются на сайте) ----------
+// Хранение в три слоя: память сервера, файл data/options.json и копия в браузере каждого игрока
+// (после перезапуска сервера браузер сам возвращает сохранённое, см. restoreOptions).
+const DATA_DIR = ENV.DATA_DIR || path.join(__dirname, 'data');
+const OPTIONS_FILE = path.join(DATA_DIR, 'options.json');
+const DEFAULTS = ROUNDS.map(rd => rd.options.slice()); // исходные тексты из кода
+const cleanText = t => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
+// null значит «исходный текст из кода», иначе сохранённый пользователем
+const cleanOverrides = list => ROUNDS.map((rd, r) => rd.options.map((_, i) => {
+  const t = cleanText(list && list[r] && list[r][i]);
+  return t && t !== DEFAULTS[r][i] ? t : null;
+}));
+let overrides = cleanOverrides([]);
+let optionsAt = 0; // когда тексты сохранили в последний раз (по часам сервера)
+try {
+  const saved = JSON.parse(fs.readFileSync(OPTIONS_FILE, 'utf8'));
+  overrides = cleanOverrides(saved.overrides);
+  optionsAt = Number(saved.updatedAt) || 0;
+  console.log('Свои тексты вариантов загружены из', OPTIONS_FILE);
+} catch {}
+const saveOptionsFile = () => {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(OPTIONS_FILE, JSON.stringify({ updatedAt: optionsAt, overrides })); }
+  catch (e) { console.warn('Не удалось записать ' + OPTIONS_FILE + ':', e.message); }
+};
+const optionTexts = r => DEFAULTS[r].map((d, i) => (overrides[r][i] != null ? overrides[r][i] : d)); // актуальные тексты раунда
+const roundsForClient = () => ROUNDS.map((rd, r) => ({ ...rd, options: optionTexts(r), defaults: DEFAULTS[r] }));
+const optionsMsg = () => ({ type: 'options', rounds: roundsForClient(), updatedAt: optionsAt, overrides });
+
 // ---------- реплики по говорящим ----------
 const NAMES = { narrator: 'Рассказчик', dima: 'Дима', anya: 'Аня' };
 const normWho = w => {
@@ -104,7 +132,7 @@ const cleanEx = list => ROUNDS.map((rd, r) => {
   return a.length >= rd.options.length ? [] : a; // хотя бы один вариант должен остаться
 });
 let excluded = cleanEx([]);
-const fullState = () => ({ type: 'state', rounds: ROUNDS, state, excluded });
+const fullState = () => ({ type: 'state', rounds: roundsForClient(), state, excluded, options: { updatedAt: optionsAt, overrides } });
 
 // ---------- Cloudflare Workers AI ----------
 async function cf(model, body) {
@@ -229,7 +257,7 @@ async function spin() {
   const enabled = ROUNDS[r].options.map((_, i) => i).filter(i => !excluded[r].includes(i));
   const index = enabled[crypto.randomInt(enabled.length)];
   state.busy = true;
-  state.results[r] = { index, label: ROUNDS[r].options[index] };
+  state.results[r] = { index, label: optionTexts(r)[index] }; // последний сохранённый текст ячейки, а не исходный из кода
   broadcast({ type: 'spin', round: r, index, label: state.results[r].label });
   try {
     const { parts, story, scene, beat } = await writeStory();
@@ -262,7 +290,7 @@ const app = express();
 app.get('/healthz', (req, res) => res.send('ok'));
 app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 20 * 1024 });
 
 // пинг раз в 25 секунд, чтобы хостинг не обрывал соединение
 setInterval(() => wss.clients.forEach(ws => {
@@ -290,6 +318,20 @@ wss.on('connection', (ws, req) => {
       else if (list.length < ROUNDS[r].options.length - 1) list.push(i);
       else return send(ws, { type: 'error', message: 'В каждом раунде должен остаться хотя бы один вариант.' });
       return broadcast({ type: 'excluded', excluded });
+    }
+    if (m.type === 'saveOptions') {
+      const t = Array.isArray(m.texts) ? m.texts : [];
+      const next = ROUNDS.map((rd, r) => rd.options.map((_, i) => cleanText(t[r] && t[r][i])));
+      if (next.some(row => row.some(x => !x))) return send(ws, { type: 'error', message: 'Текст варианта не может быть пустым.' });
+      overrides = next.map((row, r) => row.map((x, i) => (x === DEFAULTS[r][i] ? null : x)));
+      optionsAt = Math.max(Date.now(), optionsAt + 1);
+      saveOptionsFile();
+      return broadcast(optionsMsg());
+    }
+    if (m.type === 'restoreOptions') { // браузер приносит свою копию, если она новее, чем у сервера
+      const at = Number(m.updatedAt);
+      if (Number.isFinite(at) && at > optionsAt) { overrides = cleanOverrides(m.overrides); optionsAt = at; saveOptionsFile(); broadcast(optionsMsg()); }
+      return;
     }
     if (m.type === 'restore') { // после перезапуска сервера возвращаем сохранённое в браузере
       if (!excluded.some(a => a.length)) { excluded = cleanEx(m.excluded); broadcast({ type: 'excluded', excluded }); }

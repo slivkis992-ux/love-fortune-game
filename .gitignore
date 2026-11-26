@@ -3,3 +3,4 @@ node_modules/
 public/generated/
 npm-debug.log*
 .DS_Store
+data/

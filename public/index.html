@@ -98,6 +98,18 @@ ol li.off .t::after{content:' · исключено';display:inline-block;margin
 ol li.off .n{color:#7a4a60;text-shadow:none}
 ol li.off .ic{opacity:.45}
 .wheel b.off{opacity:.3}
+.topr{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.edtabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(20,8,14,.75);color:var(--ink);font-weight:600;font-size:13px}
+.chip.on{background:linear-gradient(180deg,#ff8cc0,#d4408a);border-color:rgba(255,196,224,.8);color:#fff}
+ol li.edit{padding:6px 18px 6px 24px}
+ol li.edit input{flex:1;min-width:0;background:rgba(10,4,8,.85);border:1px solid rgba(255,140,190,.55);border-radius:999px;color:var(--ink);font:500 16px Montserrat,system-ui,sans-serif;padding:10px 18px}
+ol li.edit input:focus{outline:none;border-color:var(--rose2);box-shadow:0 0 16px rgba(255,60,150,.45)}
+ol li.edit input.bad{border-color:#ff5a5a;box-shadow:0 0 14px rgba(255,80,80,.45)}
+.edbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.edsave{height:52px;padding:0 32px;border-radius:999px;border:1.5px solid rgba(255,196,224,.8);color:#fff;font-weight:700;font-size:17px;background:linear-gradient(180deg,#ff8cc0,#e8458d 50%,#a82468);box-shadow:0 0 24px var(--glow)}
+ol:not(.editing) li .t{cursor:pointer}
+ol:not(.editing) li:not(.off) .t:hover{color:#fff;text-decoration:underline dotted rgba(255,140,190,.7);text-underline-offset:4px}
 ol.hasWin li:not(.win){opacity:.42}
 ol li.win{border-color:var(--rose2);background:linear-gradient(90deg,rgba(125,22,72,.6),rgba(62,12,40,.75));
   box-shadow:0 0 26px var(--glow),inset 0 0 20px rgba(255,70,150,.2)}
@@ -164,10 +176,13 @@ button:disabled{opacity:.55;cursor:default}
 <main>
   <header class="top">
     <div class="logo"><span>Любовная</span><b>Фортуна</b></div>
-    <div class="pilltop" id="roundPill">
+    <div class="topr">
+      <button class="ghost" id="editBtn" type="button">✎ Редактировать варианты</button>
+      <div class="pilltop" id="roundPill">
       <span id="rpN">Раунд 1 из 5:</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1 4.6 2.6h2C14 6 15.600 5 17.600 5 21 5 23.100 8.400 21.600 11.800 19.500 16.400 12 21 12 21z"/></svg>
       <b id="rpT">Кто мы</b>
+    </div>
     </div>
   </header>
 
@@ -182,7 +197,15 @@ button:disabled{opacity:.55;cursor:default}
       <div class="plate"></div>
     </div>
 
-    <div class="optscol"><ol id="opts"></ol></div>
+    <div class="optscol">
+      <div class="edtabs" id="edTabs" hidden></div>
+      <ol id="opts"></ol>
+      <div class="edbar" id="edBar" hidden>
+        <button class="edsave" id="edSave" type="button">Сохранить</button>
+        <button class="ghost" id="edCancel" type="button">Отмена</button>
+        <button class="ghost" id="edReset" type="button" title="Вернуть исходные тексты этого раунда">Исходные</button>
+      </div>
+    </div>
 
     <div class="invitecol">
       <button class="invite" id="invite">
@@ -210,10 +233,13 @@ button:disabled{opacity:.55;cursor:default}
 const $ = s => document.querySelector(s);
 const code = new URLSearchParams(location.search).get('code') || '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let ROUNDS = [], S = null, EX = [], ws, angle = 0, until = 0, toastTimer;
+let ROUNDS = [], S = null, EX = [], ED = null, ws, angle = 0, until = 0, toastTimer;
 const EXK = 'lf-excluded';
 const loadEx = () => { try { const a = JSON.parse(localStorage.getItem(EXK)); return Array.isArray(a) ? a : []; } catch { return []; } };
 const saveEx = () => { try { localStorage.setItem(EXK, JSON.stringify(EX)); } catch {} };
+const OPK = 'lf-options'; // копия сохранённых текстов вариантов в этом браузере
+const loadOpt = () => { try { const o = JSON.parse(localStorage.getItem(OPK)); return o && Number.isFinite(o.updatedAt) && Array.isArray(o.overrides) ? o : null; } catch { return null; } };
+const saveOpt = o => { try { localStorage.setItem(OPK, JSON.stringify(o)); } catch {} };
 const hasEx = a => Array.isArray(a) && a.some(x => x && x.length);
 
 // цифры на колесе: на розовых секторах тёмные, на чёрных светлые
@@ -260,15 +286,23 @@ function handle(m) {
     const local = loadEx();
     if (!hasEx(EX) && hasEx(local)) ws.send(JSON.stringify({ type: 'restore', excluded: local }));
     else saveEx();
+    // то же для текстов вариантов: если копия в браузере новее, чем у сервера (например, он перезапустился), возвращаем её
+    const srv = m.options || { updatedAt: 0, overrides: [] }, loc = loadOpt();
+    if (loc && loc.updatedAt > srv.updatedAt) ws.send(JSON.stringify({ type: 'restoreOptions', updatedAt: loc.updatedAt, overrides: loc.overrides }));
+    else saveOpt(srv);
   }
   else if (!S) return;
   else if (m.type === 'peers') $('#peers').textContent = m.n > 1 ? 'Вы вдвоём 💘' : 'Ждём второго игрока…';
   else if (m.type === 'spin') { S.results[m.round] = { index: m.index, label: m.label }; S.busy = true; until = Date.now() + 4600; turn(m.index); render(); later(render); }
+  else if (m.type === 'options') {
+    ROUNDS = m.rounds; saveOpt({ updatedAt: m.updatedAt, overrides: m.overrides });
+    if (ED && ED.saving) { ED = null; leaveEditor(); toast('Варианты сохранены'); } else render();
+  }
   else if (m.type === 'excluded') { EX = m.excluded; saveEx(); render(); }
   else if (m.type === 'story') { S.story[m.round] = m.story; (S.parts = S.parts || [])[m.round] = m.parts; later(render); }
   else if (m.type === 'image') { S.images[m.round] = m.url; later(render); }
   else if (m.type === 'idle') { S.busy = false; later(render); }
-  else if (m.type === 'error') toast(m.message);
+  else if (m.type === 'error') { toast(m.message); if (ED) { ED.saving = false; edButtons(); } }
 }
 
 // Раскраска по говорящему: Дима синий, Аня розовый, рассказчик белый. Берём parts, а если их нет (старые истории), разбираем строки вида «— Дима: …».
@@ -289,12 +323,15 @@ function render() {
   $('#rpN').textContent = `Раунд ${r + 1} из ${ROUNDS.length}:`;
   $('#rpT').textContent = rd.title;
   const opts = $('#opts');
-  opts.className = done ? 'hasWin' : '';
   const exr = EX[r] || [];
-  opts.innerHTML = rd.options.map((o, i) => {
-    const off = exr.includes(i);
-    return `<li class="${(done && res.index === i ? 'win ' : '') + (off ? 'off' : '')}"><span class="n">${i + 1}</span><span class="t">${esc(o)}</span><span class="ic">${esc((rd.icons && rd.icons[i]) || '♥')}</span><button type="button" class="ex" data-i="${i}" aria-pressed="${off}" title="${off ? 'Вернуть в Фортуну' : 'Исключить из Фортуны'}" aria-label="${(off ? 'Вернуть вариант ' : 'Исключить вариант ') + (i + 1)}">${off ? '↺' : '✕'}</button></li>`;
-  }).join('');
+  if (!ED) { // пока идёт редактирование, список не перерисовываем, чтобы не сбить ввод
+    opts.className = done ? 'hasWin' : '';
+    opts.innerHTML = rd.options.map((o, i) => {
+      const off = exr.includes(i), custom = rd.defaults && o !== rd.defaults[i];
+      const icon = custom ? '✨' : ((rd.icons && rd.icons[i]) || '♥'); // у своих текстов иконка нейтральная
+      return `<li data-i="${i}" class="${(done && res.index === i ? 'win ' : '') + (off ? 'off' : '')}"><span class="n">${i + 1}</span><span class="t" title="Нажмите, чтобы изменить текст">${esc(o)}</span><span class="ic">${esc(icon)}</span><button type="button" class="ex" data-i="${i}" aria-pressed="${off}" title="${off ? 'Вернуть в Фортуну' : 'Исключить из Фортуны'}" aria-label="${(off ? 'Вернуть вариант ' : 'Исключить вариант ') + (i + 1)}">${off ? '↺' : '✕'}</button></li>`;
+    }).join('');
+  }
   nums.forEach((n, i) => n.classList.toggle('off', exr.includes(i)));
   box.classList.toggle('spinning', S.busy);
   $('#spin').hidden = done && idle;
@@ -303,6 +340,10 @@ function render() {
   $('#next').hidden = !(done && idle && r < ROUNDS.length - 1);
   $('#again').hidden = !(done && idle && r === ROUNDS.length - 1);
   $('#status').textContent = !S.busy ? '' : !revealed ? 'Колесо крутится…' : !S.story[r] ? 'Фортуна пишет вашу историю…' : 'Рисуем вас в этой сцене…';
+  if (ED) { // во время редактирования вращение и переход отключены
+    ['spin', 'next', 'again'].forEach(id => { $('#' + id).disabled = true; });
+    $('#status').textContent = 'Редактирование: нажмите «Сохранить», чтобы изменения вступили в силу.';
+  }
   let html = '';
   for (let i = r; i >= 0; i--) {
     if (!S.results[i] || (i === r && !revealed)) continue;
@@ -315,7 +356,44 @@ function render() {
 $('#opts').addEventListener('click', e => {
   const b = e.target.closest('.ex');
   if (b && S && ws.readyState === 1) ws.send(JSON.stringify({ type: 'toggle', round: S.round, index: +b.dataset.i }));
+  const t = e.target.closest('.t'); // клик по тексту ячейки открывает редактирование
+  if (t && !ED && S) startEdit(S.round, +t.closest('li').dataset.i);
 });
+
+/* ---------- редактирование текстов ячеек ---------- */
+function edButtons() { $('#edSave').disabled = !ED || ED.saving; $('#edSave').textContent = ED && ED.saving ? 'Сохраняем…' : 'Сохранить'; }
+function renderEditor(focusIdx) {
+  $('#edTabs').hidden = false; $('#edBar').hidden = false;
+  $('#edTabs').innerHTML = ROUNDS.map((x, r) => `<button type="button" class="chip${r === ED.round ? ' on' : ''}" data-r="${r}">${r + 1}. ${esc(x.title)}</button>`).join('');
+  const opts = $('#opts'); opts.className = 'editing';
+  opts.innerHTML = ED.draft[ED.round].map((t, i) => `<li class="edit"><span class="n">${i + 1}</span><input type="text" maxlength="90" data-i="${i}" value="${esc(t)}" aria-label="Вариант ${i + 1}" placeholder="Впишите свой вариант"></li>`).join('');
+  edButtons();
+  if (focusIdx != null) { const el = opts.querySelector(`input[data-i="${focusIdx}"]`); if (el) { el.focus(); el.select(); } }
+}
+function startEdit(round, focusIdx) {
+  if (!S || ED) return;
+  ED = { round, draft: ROUNDS.map(rd => rd.options.slice()), saving: false };
+  renderEditor(focusIdx); render();
+}
+function leaveEditor() { $('#edTabs').hidden = true; $('#edBar').hidden = true; $('#opts').className = ''; render(); }
+$('#editBtn').onclick = () => startEdit(S ? S.round : 0);
+$('#edTabs').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (b && ED) { ED.round = +b.dataset.r; renderEditor(); } });
+$('#opts').addEventListener('input', e => { if (ED && e.target.matches('input[data-i]')) { ED.draft[ED.round][+e.target.dataset.i] = e.target.value; e.target.classList.remove('bad'); } });
+$('#opts').addEventListener('keydown', e => { if (ED && e.key === 'Enter') $('#edSave').click(); else if (ED && e.key === 'Escape') $('#edCancel').click(); });
+$('#edCancel').onclick = () => { ED = null; leaveEditor(); };
+$('#edReset').onclick = () => { if (ED) { ED.draft[ED.round] = (ROUNDS[ED.round].defaults || ROUNDS[ED.round].options).slice(); renderEditor(); } };
+$('#edSave').onclick = () => {
+  if (!ED || ED.saving) return;
+  const texts = ED.draft.map(row => row.map(t => String(t).replace(/\s+/g, ' ').trim()));
+  for (let r = 0; r < texts.length; r++) {
+    const i = texts[r].findIndex(t => !t);
+    if (i >= 0) { ED.round = r; renderEditor(); const el = $('#opts').querySelector(`input[data-i="${i}"]`); el.classList.add('bad'); el.focus(); return toast('Текст варианта не может быть пустым'); }
+  }
+  if (!ws || ws.readyState !== 1) return toast('Нет связи с сервером. Попробуйте через минуту.');
+  ED.saving = true; edButtons();
+  ws.send(JSON.stringify({ type: 'saveOptions', texts }));
+  setTimeout(() => { if (ED && ED.saving) { ED.saving = false; edButtons(); toast('Сервер не ответил. Попробуйте ещё раз.'); } }, 10000);
+};
 const act = type => () => ws.readyState === 1 && ws.send(JSON.stringify({ type }));
 $('#spin').onclick = act('spin');
 $('#next').onclick = act('next');
